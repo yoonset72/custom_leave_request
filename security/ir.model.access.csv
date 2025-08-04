@@ -1,0 +1,6 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_employee_login,access.employee.login,model_employee_login,base.group_public,1,1,1,0
+access_hr_leave_public,hr.leave public access,hr_holidays.model_hr_leave,,1,1,1,0
+access_hr_leave_type_public,hr.leave.type public access,hr_holidays.model_hr_leave_type,,1,0,0,0
+access_hr_employee_public,hr.employee public access,hr.model_hr_employee,,1,1,0,0
+access_hr_leave_allocation_public,hr.leave.allocation public access,hr_holidays.model_hr_leave_allocation,,1,0,0,0

@@ -1,0 +1,358 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Leave Request Form Template -->
+        <template id="leave_request_form_template" name="Leave Request Form">
+            <head>
+                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"/>    
+                <link rel="stylesheet" type="text/css" href="/custom_leave_request/static/src/css/register.css"/>
+                <link rel="stylesheet" type="text/css" href="/custom_leave_request/static/src/css/leave_request.css"/>
+                <script type="text/javascript" src="/custom_leave_request/static/src/js/leave_request.js"/>
+                <meta name="csrf-token" t-att-content="request.csrf_token()"/>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+            </head>
+            <body>
+                <div class="agb-container">
+                    <!-- Company Header -->
+                    <div class="agb-header">
+                        <div class="agb-logo">
+                            <img src="/custom_leave_request/static/src/img/logo.png" alt="AGB Communication Logo" class="agb-logo-img"/>
+                        </div>
+                        <h1 class="agb-company-name">AGB Communication</h1>
+                        <p class="agb-company-subtitle">Myanmar • Employee Portal</p>
+                        <div class="agb-contact-info">
+                            <span><i class="fa fa-phone"></i> +959-765492075</span>
+                            <span><i class="fa fa-envelope"></i> hr@agbcommunication.com</span>
+                        </div>
+                    </div>
+
+                    <!-- Navigation -->
+                    <div class="agb-nav">
+                        <a href="/employee/dashboard" class="agb-nav-link">
+                            <i class="fa fa-dashboard"></i> Dashboard
+                        </a>
+                        <a href="/employee/profile" class="agb-nav-link">
+                            <i class="fa fa-user"></i> Profile
+                        </a>
+                        <a href="/leave/requests" class="agb-nav-link active">
+                            <i class="fa fa-calendar"></i> Leave Request
+                        </a>
+                        <a href="/employee/register" class="agb-nav-link logout">
+                            <i class="fa fa-sign-out"></i> Logout
+                        </a>
+                    </div>
+
+                    <!-- Leave Request Form Container -->
+                    
+                        <div id="leave-request-app"
+                            t-att-data-employee-number="employee.employee_number"
+                            t-att-data-employee-name="employee.name"></div>
+                    
+                    
+                    <!-- Fallback for non-JS users -->
+                    <noscript>
+                        <div class="agb-alert agb-alert-danger">
+                            <i class="fa fa-exclamation-triangle"></i>
+                            <strong>JavaScript Required:</strong> 
+                            This form requires JavaScript to function properly. 
+                            Please enable JavaScript in your browser.
+                        </div>
+                    </noscript>
+
+                    <!-- Footer -->
+                    <div class="agb-footer">
+                        <p>© 2024 AGB Communication Myanmar. All rights reserved.</p>
+                        <p>Secure Employee Portal • Version 2.0</p>
+                    </div>
+                </div>
+            </body>
+        </template>
+
+        <!-- Leave Request Success Template -->
+        <template id="leave_request_success_template" name="Leave Request Success">
+            <head>
+                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"/>    
+                <link rel="stylesheet" type="text/css" href="/custom_leave_request/static/src/css/register.css"/>
+                <link rel="stylesheet" type="text/css" href="/custom_leave_request/static/src/css/leave_request.css"/>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+            </head>
+            <body>
+                <div class="agb-container">
+                    <!-- Company Header -->
+                    <div class="agb-header">
+                        <div class="agb-logo">
+                            <img src="/custom_leave_request/static/src/img/logo.png" alt="AGB Communication Logo" class="agb-logo-img"/>
+                        </div>
+                        <h1 class="agb-company-name">AGB Communication</h1>
+                        <p class="agb-company-subtitle">Myanmar • Employee Portal</p>
+                        <div class="agb-contact-info">
+                            <span><i class="fa fa-phone"></i> +959-765492075</span>
+                            <span><i class="fa fa-envelope"></i> hr@agbcommunication.com</span>
+                        </div>
+                    </div>
+
+                    <!-- Navigation -->
+                     <div class="agb-nav">
+                        <a href="/employee/dashboard" class="agb-nav-link">
+                            <i class="fa fa-dashboard"></i> Dashboard
+                        </a>
+                        <a href="/employee/profile" class="agb-nav-link">
+                            <i class="fa fa-user"></i> Profile
+                        </a>
+                        <a href="/leave/requests" class="agb-nav-link active">
+                            <i class="fa fa-calendar"></i> Leave Request
+                        </a>
+                        <a href="/employee/register" class="agb-nav-link logout">
+                            <i class="fa fa-sign-out"></i> Logout
+                        </a>
+                    </div>
+
+                    <!-- Success Content -->
+                    <div class="agb-form-card">
+                        <div class="agb-form-header">
+                            <i class="fa fa-check-circle"></i>
+                            <h2>Request Submitted Successfully</h2>
+                            <p>Your leave request has been submitted for approval</p>
+                        </div>
+                        
+                        <div class="agb-form-content">
+                            <div class="agb-success-grid">
+                                <div class="agb-success-section">
+                                    <h3><i class="fa fa-info-circle"></i> Request Details</h3>
+                                    <div class="agb-info-grid">
+                                        <div class="agb-info-item">
+                                            <strong><label>Employee:    </label></strong>
+                                            <span><t t-esc="employee_name"/></span>
+                                        </div>
+                                        <div class="agb-info-item">
+                                            <strong><label>Leave Type:  </label></strong>
+                                            <span><t t-esc="leave_type"/></span>
+                                        </div>
+                                        <div class="agb-info-item">
+                                            <strong><label>Duration:    </label></strong>
+                                            <span><t t-esc="number_of_days"/> day(s)</span>
+                                        </div>
+                                        <div class="agb-info-item">
+                                            <strong><label>From Date:   </label></strong>
+                                            <span><t t-esc="date_from"/></span>
+                                        </div>
+
+                                        <div class="agb-info-item">
+                                            <strong><label>To Date: </label></strong>
+                                            <span><t t-esc="date_to"/></span>
+                                        </div>
+                                        <div class="agb-info-item full-width">
+                                            <strong><label>Description: </label></strong>
+                                            <span><t t-esc="description"/></span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="agb-success-section">
+                                    <h3><i class="fa fa-tasks"></i> Next Steps</h3>
+                                    <div class="agb-steps-list">
+                                        <div class="agb-step">
+                                            <i class="fa fa-check-circle"></i>
+                                            <span>Your request has been submitted</span>
+                                        </div>
+                                        <div class="agb-step">
+                                            <i class="fa fa-clock-o"></i>
+                                            <span>Waiting for manager approval</span>
+                                        </div>
+                                        <div class="agb-step">
+                                            <i class="fa fa-envelope"></i>
+                                            <span>You'll receive email notifications</span>
+                                        </div>
+                                        <div class="agb-step">
+                                            <i class="fa fa-list"></i>
+                                            <span>Check status in your dashboard</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="agb-success-actions">
+                                <a href="/leave/request" class="agb-btn agb-btn-primar">
+                                    <i class="fa fa-plus"></i> Submit Another Request
+                                </a>
+                                <a href="/leave/requests" class="agb-btn agb-btn-outline">
+                                    <i class="fa fa-user"></i> View All Requests
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Footer -->
+                    <div class="agb-footer">
+                        <p>© 2024 AGB Communication Myanmar. All rights reserved.</p>
+                        <p>Secure Employee Portal • Version 2.0</p>
+                    </div>
+                </div>
+            </body>
+        </template>
+    
+
+        <!-- Leave Requests List Template -->
+        <template id="leave_requests_list_template" name="My Leave Requests">
+            <head>
+                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"/>    
+                <link rel="stylesheet" type="text/css" href="/custom_leave_request/static/src/css/register.css"/>
+                <link rel="stylesheet" type="text/css" href="/custom_leave_request/static/src/css/leave_request.css"/>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+            </head>
+            <body>
+                <div class="agb-container">
+                    <!-- Company Header -->
+                    <div class="agb-header">
+                        <div class="agb-logo">
+                            <img src="/custom_leave_request/static/src/img/logo.png" alt="AGB Communication Logo" class="agb-logo-img"/>
+                        </div>
+                        <h1 class="agb-company-name">AGB Communication</h1>
+                        <p class="agb-company-subtitle">Myanmar • Employee Portal</p>
+                        <div class="agb-contact-info">
+                            <span><i class="fa fa-phone"></i> +959-765492075</span>
+                            <span><i class="fa fa-envelope"></i> hr@agbcommunication.com</span>
+                        </div>
+                    </div>
+
+                    <!-- Navigation -->
+                    <div class="agb-nav">
+                        <a href="/employee/dashboard" class="agb-nav-link">
+                            <i class="fa fa-dashboard"></i> Dashboard
+                        </a>
+                        <a href="/employee/profile" class="agb-nav-link">
+                            <i class="fa fa-user"></i> Profile
+                        </a>
+                        <a href="/leave/requests" class="agb-nav-link active">
+                            <i class="fa fa-calendar"></i> Leave Request
+                        </a>
+                        <a href="/employee/register" class="agb-nav-link logout">
+                            <i class="fa fa-sign-out"></i> Logout
+                        </a>
+                    </div>
+
+                    <!-- Leave Requests List -->
+                    <div class="agb-form-card">
+                        <div class="agb-card-header">
+                            <h3 style="margin-bottom: 30px"><i class="fa fa-list"></i> My Leave Requests</h3>
+                            <a href="/leave/request" class="agb-btn agb-btn-primary">
+                                <i class="fa fa-plus"></i> New Request
+                            </a>
+                        </div>
+                        
+                        <div class="agb-card-content">
+                            <t t-if="error">
+                                <div class="agb-alert agb-alert-danger">
+                                    <i class="fa fa-exclamation-triangle"></i>
+                                    <t t-esc="error"/>
+                                </div>
+                            </t>
+                            
+                            <t t-if="leave_requests">
+                            <!-- Desktop Table View -->
+                            <div class="agb-table-responsive">
+                                <table class="agb-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Leave Type</th>
+                                            <th>From Date</th>
+                                            <th>To Date</th>
+                                            <th>Days</th>
+                                            <th>Status</th>
+                                            <th>Submitted</th>
+                                            <th>Description</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <t t-foreach="leave_requests" t-as="leave">
+                                            <tr>
+                                                <td><t t-esc="leave.holiday_status_id.name"/></td>
+                                                <td><t t-esc="leave.request_date_from"/></td>
+                                                <td><t t-esc="leave.request_date_to"/></td>
+                                                <td><t t-esc="leave.number_of_days"/></td>
+                                                <td>
+                                                    <span t-attf-class="agb-badge agb-badge-#{
+                                                        'success' if leave.state == 'validate' else
+                                                        'warning' if leave.state == 'confirm' else
+                                                        'danger' if leave.state == 'refuse' else
+                                                        'info'
+                                                    }">
+                                                        <t t-if="leave.state == 'validate'">Approved</t>
+                                                        <t t-elif="leave.state == 'confirm'">Pending</t>
+                                                        <t t-elif="leave.state == 'refuse'">Rejected</t>
+                                                        <t t-else=""><t t-esc="leave.state.title()"/></t>
+                                                    </span>
+                                                </td>
+                                                <td><t t-esc="leave.create_date.strftime('%Y-%m-%d')"/></td>
+                                                <td><t t-esc="leave.name"/></td>
+                                            </tr>
+                                        </t>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Mobile Card View -->
+                            <div class="agb-mobile-cards">
+                                <t t-foreach="leave_requests" t-as="leave">
+                                    <div class="agb-mobile-card">
+                                        <div class="agb-mobile-card-header">
+                                            <div class="agb-mobile-card-title"><t t-esc="leave.holiday_status_id.name"/></div>
+                                            <div>
+                                                <span t-attf-class="agb-badge agb-badge-#{
+                                                    'success' if leave.state == 'validate' else
+                                                    'warning' if leave.state == 'confirm' else
+                                                    'danger' if leave.state == 'refuse' else
+                                                    'info'
+                                                }">
+                                                    <t t-if="leave.state == 'validate'">Approved</t>
+                                                    <t t-elif="leave.state == 'confirm'">Pending</t>
+                                                    <t t-elif="leave.state == 'refuse'">Rejected</t>
+                                                    <t t-else=""><t t-esc="leave.state.title()"/></t>
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="agb-mobile-card-row">
+                                            <div class="agb-mobile-card-label">From:</div>
+                                            <div class="agb-mobile-card-value"><t t-esc="leave.request_date_from"/></div>
+                                        </div>
+                                        <div class="agb-mobile-card-row">
+                                            <div class="agb-mobile-card-label">To:</div>
+                                            <div class="agb-mobile-card-value"><t t-esc="leave.request_date_to"/></div>
+                                        </div>
+                                        <div class="agb-mobile-card-row">
+                                            <div class="agb-mobile-card-label">Days:</div>
+                                            <div class="agb-mobile-card-value"><t t-esc="leave.number_of_days"/></div>
+                                        </div>
+                                        <div class="agb-mobile-card-row">
+                                            <div class="agb-mobile-card-label">Submitted:</div>
+                                            <div class="agb-mobile-card-value"><t t-esc="leave.create_date.strftime('%Y-%m-%d')"/></div>
+                                        </div>
+                                        <div class="agb-mobile-card-row">
+                                            <div class="agb-mobile-card-label">Description:</div>
+                                            <div class="agb-mobile-card-value"><t t-esc="leave.name"/></div>
+                                        </div>
+                                    </div>
+                                </t>
+                            </div>
+                        </t>
+                            <t t-else="">
+                                <div class="agb-empty-state">
+                                    <i class="fa fa-calendar-times"></i>
+                                    <h4>No Leave Requests Found</h4>
+                                    <p>You haven't submitted any leave requests yet.</p>
+                                </div>
+                            </t>
+                        </div>
+                    </div>
+
+                    
+                    <div class="agb-footer">
+                        <p>© 2024 AGB Communication Myanmar. All rights reserved.</p>
+                        <p>Secure Employee Portal • Version 2.0</p>
+                    </div>
+                </div>
+            </body>
+        </template> 
+    </data>
+</odoo>
+    

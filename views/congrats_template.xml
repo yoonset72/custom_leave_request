@@ -1,0 +1,10 @@
+<odoo>
+  <template id="congrats_template" name="Registration Success">
+    <t t-call="website.layout">
+      <div class="container">
+        <h2>Congratulations!</h2>
+        <p>Your registration is successful. You can now login and request leave or attendance.</p>
+      </div>
+    </t>
+  </template>
+</odoo>
