@@ -123,7 +123,7 @@ class LeaveController(http.Controller):
             domain = [('active', '=', True)]
 
             # Basic tag-based conditions
-            if 'intern' in lower_tags or 'prohibition' in lower_tags:
+            if 'intern' in lower_tags or 'probation' in lower_tags:
                 domain += [('name', 'ilike', 'unpaid')]
             elif 'permanent' in lower_tags:
                 if marital_status == 'married':
@@ -348,13 +348,17 @@ class LeaveController(http.Controller):
             _logger.debug("Today's date: %s, Current year: %s", today, current_year)
 
             # Casual leave logic
-            total_casual = today.month / 2
+            # total_casual = today.month / 2
             start_of_year = date(current_year, 1, 1)
             end_of_year = date(current_year, 12, 31)
 
             employee = request.env['hr.employee'].sudo().search([
                 ('id', '=', employee_number)
             ], limit=1)
+
+            join_date = employee.join_date
+
+            total_casual = (13 - join_date.month)/2
 
             if not employee:
                 _logger.debug("No employee found with employee_number: %s", employee_number)
@@ -388,7 +392,7 @@ class LeaveController(http.Controller):
             start_of_year = date(current_year, 1, 1)
 
             # Determine new accrued leave
-            months_passed = today.month
+            months_passed = 13-employee.join_date.month
             accrued_new = months_passed  # 1 day per month
 
             # Find last year carried forward balance (only until June)
