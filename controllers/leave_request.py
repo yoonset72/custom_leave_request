@@ -402,8 +402,11 @@ class LeaveController(http.Controller):
             # Determine new accrued leave
             if service_duration.years == 1:
                 months_passed = today.month - join_date.month
+                _logger.info("New %d", months_passed)
+                if today.month <= 6:
+                    months_passed = today.month - 1
             else:
-                months_passed = today.month
+                months_passed = today.month - 1
 
             accrued_new = months_passed  # 1 day per month
 
@@ -420,39 +423,99 @@ class LeaveController(http.Controller):
                 ('state', '=', 'validate'),
             ])
             prev_taken = sum(prev_annual_leaves.mapped('number_of_days'))
-            prev_total = 12  # Assuming max earned was 12
+
+            _logger.info("Taken leave of previous year %d", prev_taken)
+            _logger.info("join year %d",join_date.year)
+            _logger.info("previous year %s", today.year-1)
+
+            if join_date.year == (today.year - 1):
+                for prev_total in range(join_date.month, today.month):
+                    _logger.info("1 year service in this year")
+            elif join_date.year == (today.year - 2):
+                prev_total = 13 - join_date.month
+                _logger.info("Total %d", prev_total)
+            else:
+                prev_total = 12
+                _logger.info("After 1 year")
+                _logger.info("Previous taken %d", prev_taken)
+                _logger.info("Previous total %d", prev_total)
+
             carried_forward = max(prev_total - prev_taken, 0)
+
 
             # Carried forward only valid until June
             if today <= carried_forward_cutoff:
-                effective_carried = carried_forward
-            else:
+                effective_carried = carried_forward 
+                total_annual = accrued_new + effective_carried
+
+                _logger.info(" before Carry %d", carried_forward)
+
+                current_annual_leaves = request.env['hr.leave'].sudo().search([
+                    ('employee_id', '=', employee.id),
+                    ('holiday_status_id.name', 'ilike', 'annual'),
+                    ('request_date_from', '>=', start_of_year),
+                    ('request_date_to', '<=', carried_forward_cutoff),
+                    ('state', '=', 'validate'),
+                ])
+
+                annual_pending_leaves = request.env['hr.leave'].sudo().search([
+                    ('employee_id', '=', employee.id),
+                    ('holiday_status_id.name', 'ilike', 'annual'),
+                    ('request_date_from', '>=', start_of_year),
+                    ('request_date_to', '<=', carried_forward_cutoff),
+                    ('state', '=', 'confirm'),
+                ])
+                taken_annual = sum(current_annual_leaves.mapped('number_of_days'))
+                pending_annual = sum(annual_pending_leaves.mapped('number_of_days'))           
+                available_annual = max(total_annual - taken_annual, 0)   
+
+                if effective_carried > 0:
+                    carried_forward -= taken_annual
+                    _logger.info("Before July Carry %d", carried_forward)
+                else:
+                    accrued_new -= taken_annual
+
+            else:          
                 effective_carried = 0
+                total_annual = accrued_new + effective_carried
 
-            total_annual = accrued_new + effective_carried
-            _logger.info("Accured new %d", accrued_new)
-            _logger.info("Carry %d", effective_carried)
-            _logger.info("current month %d", today.month)
+                _logger.info("Carry forward %d", carried_forward)
 
-            # Taken in this year
-            current_annual_leaves = request.env['hr.leave'].sudo().search([
-                ('employee_id', '=', employee.id),
-                ('holiday_status_id.name', 'ilike', 'annual'),
-                ('request_date_from', '>=', start_of_year),
-                ('request_date_to', '<=', end_of_year),
-                ('state', '=', 'validate'),
-            ])
+                current_annual_leaves = request.env['hr.leave'].sudo().search([
+                    ('employee_id', '=', employee.id),
+                    ('holiday_status_id.name', 'ilike', 'annual'),
+                    ('request_date_from', '>=', carried_forward_cutoff),
+                    ('request_date_to', '<=', end_of_year),
+                    ('state', '=', 'validate'),
+                ])
 
-            annual_pending_leaves = request.env['hr.leave'].sudo().search([
-                ('employee_id', '=', employee.id),
-                ('holiday_status_id.name', 'ilike', 'annual'),
-                ('request_date_from', '>=', start_of_year),
-                ('request_date_to', '<=', end_of_year),
-                ('state', '=', 'confirm'),
-            ])
-            taken_annual = sum(current_annual_leaves.mapped('number_of_days'))
-            available_annual = max(total_annual - taken_annual, 0)
-            pending_annual = sum(annual_pending_leaves.mapped('number_of_days'))
+                annual_pending_leaves = request.env['hr.leave'].sudo().search([
+                    ('employee_id', '=', employee.id),
+                    ('holiday_status_id.name', 'ilike', 'annual'),
+                    ('request_date_from', '>=', carried_forward_cutoff),
+                    ('request_date_to', '<=', end_of_year),
+                    ('state', '=', 'confirm'),
+                ])
+                taken_annual = sum(current_annual_leaves.mapped('number_of_days'))  
+
+                if carried_forward > 0:
+                    carried_forward -= taken_annual
+                    _logger.info("Carry %d", carried_forward)
+                else:
+                    accrued_new -= taken_annual
+                    temp = accrued_new
+                    _logger.info("Temp Carry %d", temp)
+
+                taken_annual = sum(current_annual_leaves.mapped('number_of_days'))  + temp
+
+                
+                available_annual = max(total_annual - taken_annual, 0)     
+                pending_annual = sum(annual_pending_leaves.mapped('number_of_days'))
+
+                _logger.info("Accured new %d", accrued_new)
+                _logger.info("Carry %d", effective_carried)
+                _logger.info("current month %d", today.month)
+                _logger.info("temp %d", temp)
 
             total_medical = 30
             medical_leaves = request.env['hr.leave'].sudo().search([
