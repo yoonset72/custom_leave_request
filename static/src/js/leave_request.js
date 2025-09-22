@@ -33,20 +33,20 @@ class LeaveRequestForm {
         this.setupEventListeners();
     }
 
-    async loadTimeOffTypes() {
-        try {
-            const typesResponse = await fetch('/api/time-off-types', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({})
-            });
-            const typesData = await typesResponse.json();
-            this.timeOffTypes = typesData.result.result || [];
-        } catch (error) {
-            this.showNotification('Error loading leave types', 'error');
-        }
+   async loadTimeOffTypes() {
+    try {
+        const typesResponse = await fetch('/api/time-off-types', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+        const typesData = await typesResponse.json();
+        // Only show leave types as returned by the backend (according to rules)
+        this.timeOffTypes = typesData.result.result || [];
+    } catch (error) {
+        this.showNotification('Error loading leave types', 'error');
     }
-
+}
     async loadLeaveBalance() {
         const res = await fetch('/api/leave-balance', {
             method: 'POST',
@@ -58,16 +58,26 @@ class LeaveRequestForm {
         const data = response.result;
 
         if (data && data.success) {
+            const today = new Date();
+            const cutoff = new Date(today.getFullYear(), 5, 30); // June 30
+            const annualData = data.annual || { total_dynamic: 0, taken: 0, available: 0, pending: 0 };
+
+            // Apply cutoff rule: after June 30, use system_taken
+            const annualTaken = (today > cutoff)
+                ? (annualData.system_taken ?? annualData.taken ?? 0)
+                : (annualData.taken ?? 0);
+
             this.leaveBalance = {
                 casual: data.casual || { total: 0, taken: 0, available: 0, pending: 0 },
-                annual: data.annual || { total: 0, taken: 0, available: 0, pending: 0 },
-                medical: data.medical || { total: 0, taken: 0, available: 0, pending: 0 },
-                funeral: data.funeral || { total: 0, taken: 0, available: 0, pending: 0 },
-                marriage: data.marriage || { total: 0, taken: 0, available: 0, pending: 0 },
-                unpaid: data.unpaid || { total: 0, taken: 0, available: 0, pending: 0 },
-                maternity: data.maternity || { total: 0, taken: 0, available: 0, pending: 0 },
-                paternity: data.paternity || { total: 0, taken: 0, available: 0, pending: 0 }
+                annual: { ...annualData, taken: annualTaken },  // <-- replaced taken with cutoff-aware value
+                medical: data.medical || { total: 30, taken: 0, available: 0, pending: 0 },
+                funeral: data.funeral || { total: 7, taken: 0, available: 0, pending: 0 },
+                marriage: data.marriage || { total: 5, taken: 0, available: 0, pending: 0 },
+                unpaid: data.unpaid || { total: 30, taken: 0, available: 0, pending: 0 },
+                maternity: data.maternity || { total: 98, taken: 0, available: 0, pending: 0 },
+                paternity: data.paternity || { total: 15, taken: 0, available: 0, pending: 0 }
             };
+
             console.log("✅ Leave balance loaded:", this.leaveBalance);
         } else {
             console.warn("⚠️ Failed to load leave balance or success=false");
@@ -80,17 +90,10 @@ class LeaveRequestForm {
         return casualLeaveType.name.toLowerCase().includes('casual');
     }
 
-    async maybeCheckOverlap() {
-    if (this.formData.leaveTypeName !== 'casual') {
-    const leaveName = this.formData.leaveTypeName;
-    const balance = this.leaveBalance?.[leaveName];
+   async maybeCheckOverlap() {
+    this.hasBlockingError = false;  // reset on every check
 
-    if (balance && this.formData.number_of_days > balance.available) {
-        this.showNotification(`You cannot request more than your available ${leaveName} leave balance.`, 'error');
-        return;
-    }
-}
-
+    // --- Get dates early ---
     const fromDateInput = document.querySelector('[name="request_date_from"]');
     const toDateInput = document.querySelector('[name="request_date_to"]');
     const fromDate = fromDateInput?.value;
@@ -98,46 +101,50 @@ class LeaveRequestForm {
 
     if (!fromDate || !toDate) return;
 
-    // Check duration
-    const start = new Date(fromDate);
-    const end = new Date(toDate);
-    const durationInDays = (end - start) / (1000 * 60 * 60 * 24) + 1;
-    
-
-   if (this.formData.leaveTypeName === 'casual' && this.formData.number_of_days > 2) {
-    this.showNotification("Casual Leave cannot exceed 2 days.", 'error');
-    console.log(`DEBUG: Casual Leave cannot exceed 2 days.`);
-    return; 
-}
-
-// Check if duration exceeds available balance (except for casual leave)
+    // --- Balance check (non-casual leave) ---
     if (this.formData.leaveTypeName !== 'casual') {
         const leaveName = this.formData.leaveTypeName;
         const balance = this.leaveBalance?.[leaveName];
 
-        console.log(`DEBUG: Checking balance for '${leaveName}' leave:`, balance);
-        console.log(`DEBUG: Requested number_of_days =`, this.formData.number_of_days);
-
         if (balance && this.formData.number_of_days > balance.available) {
-            this.showNotification(`You cannot request more than your available ${leaveName} leave balance.`, 'error');
+            this.showNotification(
+                `You cannot request more than your available ${leaveName} leave balance.`,
+                'error'
+            );
+            this.hasBlockingError = true;
             return;
         }
     }
 
+    // --- Duration check ---
+    const start = new Date(fromDate);
+    const end = new Date(toDate);
+    const durationInDays = (end - start) / (1000 * 60 * 60 * 24) + 1;
 
+    if (this.formData.leaveTypeName === 'casual' && this.formData.number_of_days > 2) {
+        this.showNotification("Casual Leave cannot exceed 2 days.", 'error');
+        this.hasBlockingError = true;
+        console.log(`DEBUG: Casual Leave cannot exceed 2 days.`);
+        return;
+    }
 
-    // Proceed with overlap check
+    // --- Overlap check (only once) ---
     try {
         const response = await this.checkCasualLeaveOverlap(fromDate, toDate);
         if (!response.success) {
             this.showNotification(response.error || "Overlap check failed", 'error');
+            this.hasBlockingError = true;
         } else {
+            this.hasBlockingError = false; // ✅ clear only if valid
             console.log("✅ No overlapping leave found.");
         }
     } catch (err) {
         this.showNotification("Network or parsing error: " + err.message, 'error');
+        this.hasBlockingError = true;
     }
+
 }
+
 
     async checkCasualLeaveOverlap(fromDate, toDate) {
     const payload = {
@@ -228,7 +235,7 @@ class LeaveRequestForm {
                                                     <div>Taken</div>
                                                     <div>Balance</div>
                                                     <div>Pending</div>
-                                                    <div><strong>${annual.total ?? 0}</strong></div>
+                                                    <div><strong>${annual.total_dynamic ?? 0}</strong></div>
                                                     <div><strong>${annual.taken ?? 0}</strong></div>
                                                     <div><strong>${annual.available ?? 0}</strong></div>
                                                     <div><strong>${annual.pending ?? 0}</strong></div>
@@ -422,6 +429,49 @@ class LeaveRequestForm {
     const toDateInput = form.querySelector('[name="request_date_to"]');
     const halfDay = form.querySelector('[name="half_day"]');
 
+    // --- Helper: Add working days excluding weekends ---
+    const addWorkingDays = (startDate, days) => {
+        let remaining = days;
+        let date = new Date(startDate);
+        while (remaining > 0) {
+            date.setDate(date.getDate() + 1);
+            const day = date.getDay();
+            if (day !== 0 && day !== 6) remaining--; // skip Sat/Sun
+        }
+        return date;
+    };
+
+    // --- Helper: Apply annual leave restriction ---
+    const applyAnnualLeaveRestriction = () => {
+        if (!fromDateInput || !toDateInput) return;
+        const minDateObj = addWorkingDays(new Date(), 3);
+        const minDate = minDateObj.toISOString().split('T')[0];
+
+        fromDateInput.setAttribute('min', minDate);
+        toDateInput.setAttribute('min', minDate);
+
+        // 🚫 reset if old dates are invalid
+        if ((fromDateInput.value && fromDateInput.value < minDate) || 
+            (toDateInput.value && toDateInput.value < minDate)) {
+            fromDateInput.value = '';
+            toDateInput.value = '';
+            this.showNotification(
+                "Annual leave must be requested at least 3 working days in advance. Dates have been cleared.",
+                'error'
+            );
+            this.hasBlockingError = true;
+        }
+    };
+
+
+    // --- Helper: Apply default restriction (today) ---
+    const applyDefaultRestriction = () => {
+        if (!fromDateInput || !toDateInput) return;
+        const todayStr = new Date().toISOString().split('T')[0];
+        fromDateInput.setAttribute('min', todayStr);
+        toDateInput.setAttribute('min', todayStr);
+    };
+
     // Handle leave type selection
     document.querySelectorAll('.time-off-type').forEach(typeDiv => {
         typeDiv.addEventListener('click', () => {
@@ -434,9 +484,9 @@ class LeaveRequestForm {
             const leaveName = leaveNameRaw.replace('leave', '').trim();
             this.formData.leaveTypeName = leaveName;
 
+            // Handle attachment requirement
             const attachmentContainer = document.getElementById('attachmentContainer');
             attachmentContainer.innerHTML = '';
-
             if (!['casual', 'annual', 'unpaid'].includes(leaveName)) {
                 console.log(`Attachment required for leave type: ${leaveNameRaw}`);
                 attachmentContainer.style.display = 'block';
@@ -447,8 +497,8 @@ class LeaveRequestForm {
                             <label class="form-label">
                                 <i class="fa fa-paperclip"></i> Attachment for Evidence of Leave Request
                             </label>
-                            <input type="file" name="attachment" class="form-control" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" required
-                            >
+                            <input type="file" name="attachment" class="form-control" 
+                                   accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" required>
                         </div>
                     </div>
                 `;
@@ -457,75 +507,38 @@ class LeaveRequestForm {
                 attachmentContainer.style.display = 'none';
             }
 
+            // Toggle annual note
             const annualNote = document.getElementById('annualNote');
-
-            if (leaveName === 'annual' && annualNote) {
-                annualNote.style.display = 'inline';
-            } else if (annualNote) {
-                annualNote.style.display = 'none';
+            if (annualNote) {
+                annualNote.style.display = (leaveName === 'annual') ? 'inline' : 'none';
             }
 
-            // --- Annual Leave: enforce 3 working days notice rule excluding weekends ---
-            if (leaveName === 'annual' && fromDateInput) {
-                // Calculate min date skipping weekends
-                function addWorkingDays(startDate, days) {
-                    let count = 0;
-                    let date = new Date(startDate);
-                    while (count < days) {
-                        date.setDate(date.getDate() + 1);
-                        const day = date.getDay();
-                        if (day !== 0 && day !== 6) { // Skip Sunday(0) and Saturday(6)
-                            count++;
-                        }
-                    }
-                    return date;
-                }
-
-                const today = new Date();
-                const minDateObj = addWorkingDays(today, 4);
-                const minDate = minDateObj.toISOString().split('T')[0];
-
-                fromDateInput.setAttribute('min', minDate);
-                toDateInput.setAttribute('min',minDate)
-                
-                if (fromDateInput.value && fromDateInput.value < minDate) {
-                    this.showNotification("Annual leave must be requested at least 3 working days in advance.", 'error');
-                    fromDateInput.value = ''; // reset invalid selection
-                }
+            // Apply restrictions
+            if (leaveName === 'annual') {
+                applyAnnualLeaveRestriction();
             } else {
-                // Remove min restriction for other leave types
-                const today = new Date().toISOString().split('T')[0];
-                fromDateInput?.setAttribute('min', today);
+                applyDefaultRestriction();
             }
-
         });
     });
 
-    // Set date restrictions
-    const today = new Date().toISOString().split('T')[0];
-    if (fromDateInput && toDateInput) {
-        fromDateInput.min = today;
-        toDateInput.min = today;
+    // --- Date restrictions ---
+    applyDefaultRestriction();
 
+    if (fromDateInput && toDateInput) {
         fromDateInput.addEventListener('change', async () => {
             await this.calculateDuration();
             await this.maybeCheckOverlap();
 
-            // Extra check: casual leave should not exceed 2 days
+            // Casual leave extra check
             if (this.formData.leaveTypeName === 'casual' && this.formData.number_of_days > 2) {
                 this.showNotification("Casual leave cannot exceed 2 days.", 'error');
+                fromDateInput.value = '';
             }
 
-
-            // Annual leave check (in case user changes date after selecting)
+            // Annual leave check
             if (this.formData.leaveTypeName === 'annual') {
-                const selected = new Date(fromDateInput.value);
-                const minDate = new Date();
-                minDate.setDate(minDate.getDate() + 3);
-                if (selected < minDate) {
-                    this.showNotification("Annual leave must be requested at least 3 days in advance.", 'error');
-                    fromDateInput.value = '';
-                }
+                applyAnnualLeaveRestriction();
             }
         });
 
@@ -535,14 +548,17 @@ class LeaveRequestForm {
 
             if (this.formData.leaveTypeName === 'casual' && this.formData.number_of_days > 2) {
                 this.showNotification("Casual leave cannot exceed 2 days.", 'error');
+                toDateInput.value = '';
             }
         });
     }
 
+    // Half-day toggle
     if (halfDay) {
         halfDay.addEventListener('change', () => this.calculateDuration());
     }
 }
+
 
     updateTypeSelection() {
         document.querySelectorAll('.time-off-type').forEach(div => {
@@ -568,8 +584,11 @@ class LeaveRequestForm {
             if (to < from) {
                 this.formData.number_of_days = 0;
                 document.getElementById('durationDisplay').style.display = 'none';
+                this.showNotification("End date cannot be earlier than start date.", "error");
+                this.hasBlockingError = true;   // 🚫 mark blocking
                 return;
             }
+
 
             let totalDays = Math.floor((to - from) / (1000 * 60 * 60 * 24)) + 1;
 
@@ -583,83 +602,116 @@ class LeaveRequestForm {
         }
     }
 
-
-    
     async handleSubmit(e) {
-    e.preventDefault();
-    const form = e.target;
+        e.preventDefault();
 
-    const formData = new FormData(form);
-    formData.append('employee_number', this.employeeNumber);
-    formData.append('number_of_days', this.formData.number_of_days);
-
-    // Required fields validation
-    const requiredFields = ['holiday_status_id', 'request_date_from', 'request_date_to', 'name'];
-    for (let field of requiredFields) {
-        const value = formData.get(field);
-        if (!value || (field === 'name' && value.trim() === '')) {
-            this.showNotification('Please fill in all required fields', 'error');
+        // 🚫 Block if error already active
+        if (this.hasBlockingError) {
+            this.showNotification("Please fix the highlighted errors before submitting.", "error");
             return;
         }
-    }
 
-    // Check date duration
-    if (this.formData.number_of_days <= 0) {
-        this.showNotification('Invalid date range selected', 'error');
-        return;
-    }
+        const form = e.target;
+        const formData = new FormData(form);
+        formData.append('employee_number', this.employeeNumber);
+        formData.append('number_of_days', this.formData.number_of_days);
 
-    if (this.formData.leaveTypeName === 'casual' && this.formData.number_of_days > 2) {
-        this.showNotification("Casual Leave cannot exceed 2 days.", 'error');
-        return;
-    }
-
-    const today = new Date();
-    const fromDate = new Date(this.formData.request_date_from);
-    today.setDate(today.getDate() + 3);
-
-    if (this.formData.leaveTypeName === 'annual' && fromDate < today) {
-        this.showNotification("Annual leave must be requested at least 3 days in advance.", 'error');
-        return;
-    }
-
-    this.setLoading(true);
-
-    try {
-        const response = await fetch('/api/leave-request', {
-            method: 'POST',
-            body: formData 
-        });
-
-        const rpcResponse = await response.json();
-        const result = rpcResponse;
-
-        if (result && result.success) {
-            this.showNotification(result.message || 'Leave request submitted successfully!', 'success');
-
-            setTimeout(() => {
-                const leaveData = result.data;
-                const params = new URLSearchParams({
-                    employee_name: leaveData.employee_name,
-                    leave_type: leaveData.leave_type,
-                    date_from: leaveData.date_from,
-                    date_to: leaveData.date_to,
-                    number_of_days: leaveData.number_of_days,
-                    description: leaveData.description
-                });
-                window.location.href = `/leave/success?${params.toString()}`;
-            }, 1500);
-        } else {
-            const errorMessage = result?.error || 'Failed to submit leave request';
-            this.showNotification(errorMessage, 'error');
+        // --- Required fields validation ---
+        const requiredFields = ['holiday_status_id', 'request_date_from', 'request_date_to', 'name'];
+        for (let field of requiredFields) {
+            const value = formData.get(field);
+            if (!value || (field === 'name' && value.trim() === '')) {
+                this.showNotification('Please fill in all required fields', 'error');
+                return;
+            }
         }
-    } catch (error) {
-        console.error('Error submitting request:', error);
-        this.showNotification('Network error. Please try again.', 'error');
-    } finally {
-        this.setLoading(false);
+
+        // --- Date consistency check ---
+        const fromDate = new Date(formData.get('request_date_from'));
+        const toDate = new Date(formData.get('request_date_to'));
+
+        if (toDate < fromDate) {
+            this.showNotification("End date cannot be earlier than start date.", "error");
+            this.hasBlockingError = true;
+            return;
+        }
+
+        // --- Date duration check ---
+        if (this.formData.number_of_days <= 0) {
+            this.showNotification('Invalid date range selected', 'error');
+            this.hasBlockingError = true;
+            return;
+        }
+
+        // --- Casual leave rule check ---
+        if (this.formData.leaveTypeName === 'casual' && this.formData.number_of_days > 2) {
+            this.showNotification("Casual Leave cannot exceed 2 days.", 'error');
+            this.hasBlockingError = true;
+
+            // Reset from & to date so user must pick again
+            const fromDateInput = document.querySelector('[name="request_date_from"]');
+            const toDateInput = document.querySelector('[name="request_date_to"]');
+            if (fromDateInput) fromDateInput.value = '';
+            if (toDateInput) toDateInput.value = '';
+
+            return;
+        }
+
+        // --- Annual leave rule check ---
+        const today = new Date();
+        const minAnnualStart = new Date();
+        minAnnualStart.setDate(today.getDate() + 3);
+
+        if (this.formData.leaveTypeName === 'annual' && fromDate < minAnnualStart) {
+            this.showNotification("Annual leave must be requested at least 3 days in advance.", 'error');
+            this.hasBlockingError = true;
+            return;
+        }
+
+        this.setLoading(true);
+
+        try {
+            const response = await fetch('/api/leave-request', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.status}`);
+            }
+
+            const rpcResponse = await response.json();
+            const result = rpcResponse?.result || rpcResponse; // support both shapes
+
+            if (result?.success) {
+                this.showNotification(result.message || 'Leave request submitted successfully!', 'success');
+
+                setTimeout(() => {
+                    const leaveData = result.data || {};
+                    const params = new URLSearchParams({
+                        employee_name: leaveData.employee_name || this.employeeName,
+                        leave_type: leaveData.leave_type || this.formData.leaveTypeName,
+                        date_from: leaveData.date_from || this.formData.request_date_from,
+                        date_to: leaveData.date_to || this.formData.request_date_to,
+                        number_of_days: leaveData.number_of_days || this.formData.number_of_days,
+                        description: leaveData.description || ''
+                    });
+                    window.location.href = `/leave/success?${params.toString()}`;
+                }, 1500);
+            } else {
+                const errorMessage = result?.error || 'Failed to submit leave request';
+                this.showNotification(errorMessage, 'error');
+                this.hasBlockingError = true;
+            }
+        } catch (error) {
+            console.error('Error submitting request:', error);
+            this.showNotification(error.message || 'Network error. Please try again.', 'error');
+            this.hasBlockingError = true;
+        } finally {
+            this.setLoading(false);
+        }
     }
-}
+
    
     setLoading(loading) {
         const submitBtn = document.getElementById('submitBtn');

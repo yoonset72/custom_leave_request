@@ -134,7 +134,7 @@
                   </div>
                   <div class="agb-info-item">
                     <label>Approver of leave Request</label>
-                    <span><t t-esc="employee.hr_officer_names or 'Not Set'"/></span>
+                    <span><t t-esc="employee.hr_officer_ids.name or 'Not Set'"/></span>
                   </div>
                   <div class="agb-info-item">
                     <label>Work Email</label>
