@@ -347,6 +347,8 @@ class LeaveController(http.Controller):
             current_year = today.year
             _logger.debug("Today's date: %s, Current year: %s", today, current_year)
 
+            
+
             # Casual leave logic
             # total_casual = today.month / 2
             start_of_year = date(current_year, 1, 1)
@@ -356,9 +358,15 @@ class LeaveController(http.Controller):
                 ('id', '=', employee_number)
             ], limit=1)
 
-            join_date = employee.join_date
+            if employee.join_date:
+                join_date = employee.join_date  # Already a datetime.date object
+                today = datetime.today().date()  # Make sure both are date objects
+                service_duration = relativedelta(today, join_date)
 
-            total_casual = (13 - join_date.month)/2
+            if today.year == join_date.year:
+                total_casual = (13 - join_date.month)/2
+            else:
+                total_casual = 6
 
             if not employee:
                 _logger.debug("No employee found with employee_number: %s", employee_number)
@@ -392,7 +400,11 @@ class LeaveController(http.Controller):
             start_of_year = date(current_year, 1, 1)
 
             # Determine new accrued leave
-            months_passed = 13-employee.join_date.month
+            if service_duration.years == 1:
+                months_passed = today.month - join_date.month
+            else:
+                months_passed = today.month
+
             accrued_new = months_passed  # 1 day per month
 
             # Find last year carried forward balance (only until June)
@@ -418,6 +430,9 @@ class LeaveController(http.Controller):
                 effective_carried = 0
 
             total_annual = accrued_new + effective_carried
+            _logger.info("Accured new %d", accrued_new)
+            _logger.info("Carry %d", effective_carried)
+            _logger.info("current month %d", today.month)
 
             # Taken in this year
             current_annual_leaves = request.env['hr.leave'].sudo().search([
